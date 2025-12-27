@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::process::Command;
 
 fn main() {
     loop {
@@ -26,5 +27,28 @@ fn main() {
 
         println!("Executing: {}", command);
         println!("Arguments: {:?}", args);
+
+        if !command.is_empty() {
+            let child = Command::new(command)
+                .args(&args)
+                .spawn();
+
+            match child {
+                Ok(mut child_process) => {
+                    let status = child_process.wait().expect("Failed to wait on child");
+
+                    if !status.success() {
+                        eprintln!("Command exited with an error status.");
+                    }
+                }
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        eprintln!("Shelly: command not found: {}", command);
+                    } else {
+                        eprintln!("Shelly: an error occurred: {}", e);
+                    }
+                }
+            }
+        }
     }
 }
