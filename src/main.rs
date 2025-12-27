@@ -1,6 +1,7 @@
 use std::io::{self, Write};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::env;
+use std::fs::File;
 
 fn main() {
     loop {
@@ -39,22 +40,35 @@ fn main() {
                 }
             }
             _ => {
-                let child = Command::new(command)
-                    .args(&args)
-                    .spawn();
+                let mut command_args = args.clone();
+                let mut redirect_file = None;
 
-                match child {
-                    Ok(mut child_process) => {
-                        let status = child_process.wait().expect("Failed to wait on child");
-                        if !status.success() {
-                            eprintln!("Command exited with an error status.");
+                if let Some(pos) = command_args.iter().position(|&r| r == ">") {
+                    if let Some(filename) = command_args.get(pos + 1) {
+                        match File::create(filename) {
+                            Ok(file) => redirect_file = Some(file),
+                            Err(e) => eprintln!("Shelly: redirection error: {}", e),
                         }
+                        command_args.drain(pos..);
+                    }
+                }
+
+                let mut child_cmd = Command::new(command);
+                child_cmd.args(&command_args);
+
+                if let Some(file) = redirect_file {
+                    child_cmd.stdout(Stdio::from(file));
+                }
+
+                match child_cmd.spawn() {
+                    Ok(mut child_process) => {
+                        let _ = child_process.wait();
                     }
                     Err(e) => {
                         if e.kind() == std::io::ErrorKind::NotFound {
                             eprintln!("Shelly: command not found: {}", command);
                         } else {
-                            eprintln!("Shelly: an error occurred: {}", e);
+                            eprintln!("Shelly: {}", e);
                         }
                     }
                 }
