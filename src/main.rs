@@ -40,38 +40,67 @@ fn main() {
                 }
             }
             _ => {
-                let mut command_args = args.clone();
-                let mut redirect_file = None;
+                if let Some(pipe_pos) = args.iter().position(|&r| r == "|") {
+                    let left_cmd_name = command;
+                    let left_args = &args[..pipe_pos];
 
-                if let Some(pos) = command_args.iter().position(|&r| r == ">") {
-                    if let Some(filename) = command_args.get(pos + 1) {
-                        match File::create(filename) {
-                            Ok(file) => redirect_file = Some(file),
-                            Err(e) => eprintln!("Shelly: redirection error: {}", e),
+                    let right_cmd_name = args[pipe_pos + 1];
+                    let right_args = &args[pipe_pos + 2..];
+
+                    let left_child = Command::new(left_cmd_name)
+                        .args(left_args)
+                        .stdout(Stdio::piped())
+                        .spawn();
+
+                    match left_child {
+                        Ok(left_proc) => {
+                            let right_child = Command::new(right_cmd_name)
+                                .args(right_args)
+                                .stdin(Stdio::from(left_proc.stdout.unwrap()))
+                                .spawn();
+
+                            match right_child {
+                                Ok(mut right_proc) => {
+                                    let _ = right_proc.wait();
+                                }
+                                Err(e) => eprintln!("Shelly: right command error: {}", e),
+                            }
                         }
-                        command_args.drain(pos..);
+                        Err(e) => eprintln!("Shelly: left command error: {}", e),
                     }
-                }
+                } else {
+                    let mut command_args = args.clone();
+                    let mut redirect_file = None;
 
-                let mut child_cmd = Command::new(command);
-                child_cmd.args(&command_args);
-
-                if let Some(file) = redirect_file {
-                    child_cmd.stdout(Stdio::from(file));
-                }
-
-                match child_cmd.spawn() {
-                    Ok(mut child_process) => {
-                        let _ = child_process.wait();
+                    if let Some(pos) = command_args.iter().position(|&r| r == ">") {
+                        if let Some(filename) = command_args.get(pos + 1) {
+                            match File::create(filename) {
+                                Ok(file) => redirect_file = Some(file),
+                                Err(e) => eprintln!("Shelly: redirection error: {}", e),
+                            }
+                            command_args.drain(pos..);
+                        }
                     }
-                    Err(e) => {
-                        if e.kind() == std::io::ErrorKind::NotFound {
-                            eprintln!("Shelly: command not found: {}", command);
-                        } else {
-                            eprintln!("Shelly: {}", e);
+
+                    let mut child_cmd = Command::new(command);
+                    child_cmd.args(&command_args);
+
+                    if let Some(file) = redirect_file {
+                        child_cmd.stdout(Stdio::from(file));
+                    }
+
+                    match child_cmd.spawn() {
+                        Ok(mut child) => { let _ = child.wait(); }
+                        Err(e) => {
+                            if e.kind() == std::io::ErrorKind::NotFound {
+                                eprintln!("Shelly: command not found: {}", command);
+                            } else {
+                                eprintln!("Shelly: {}", e);
+                            }
                         }
                     }
                 }
+            }
             }
         }
     }
