@@ -1,6 +1,9 @@
 [package]
 name = "shelly"
-version = "0.1.0"
+version = "0.1.4"
 edition = "2024"
+authors = ["Debzillaa"]
+license = "MIT"
+description = "A Unix-style shell written in Rush focusing on process management and IPC."
 
 [dependencies]
