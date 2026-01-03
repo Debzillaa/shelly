@@ -1,4 +1,4 @@
-# 🌌 Shelly
+# </> Shelly
 A high-performance Unix-style shell written in **Rust**. Built to explore systems programming, process lifecycles, and Inter-Process Communication (IPC).
 
 ## 🚀 Features
